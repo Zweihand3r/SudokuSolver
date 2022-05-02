@@ -1,4 +1,4 @@
-import { easy, medium, custom } from "/data.js"
+import { constructData, easy, medium, custom } from "/data.js"
 
 const PUZZLE = medium
 
@@ -15,25 +15,36 @@ const contBtn = document.querySelector("#continue")
 const solveBtn = document.querySelector("#solve")
 const possiblesBtn = document.querySelector("#possibles")
 const clearBtn = document.querySelector("#clear")
+const clearSolBtn = document.querySelector("#clearSol")
 const grid = []
 const gridState = []
 const quadrants = {
   q1: [], q2: [], q3: [], q4: [], q5: [], q6: [], q7: [], q8: [], q9: []
 }
 let hoverSquare = { x: -1, y: -1 }
+let userState = [] // For storing user input
 
 const init = () => {
   contBtn.addEventListener("click", solve1Cycle)
   solveBtn.addEventListener("click", solve)
   possiblesBtn.addEventListener("click", showPossibleNumbers)
   clearBtn.addEventListener("click", clearGrid)
+  clearSolBtn.addEventListener("click", clearSolution)
 
   createGrid()
   attachKeyListeners()
 
-  PUZZLE.forEach(({ x, y, val }) => {
-    setInGrid(x, y, val)
-  });
+  if (localStorage.getItem("current")) {
+    userState = JSON.parse(localStorage.getItem("current"))
+    const puzzleData = constructData(userState)
+    puzzleData.forEach(({ x, y, val }) => {
+      setInGridUser(x, y, val)
+    });
+  } else {
+    PUZZLE.forEach(({ x, y, val }) => {
+      setInGridUser(x, y, val)
+    });
+  }
 
   generateQuadrants()
 }
@@ -55,20 +66,23 @@ const createDiv = (parent, { id, className, classList, text }) => {
 const createGrid = () => {
   for (let y = 0; y < 9; y++) {
     const row = []
-    const rowState = []
+    const rowGrid = []
+    const rowUser = []
     const rowDiv = createDiv(gridDiv, { className: "row" })
     for (let x = 0; x < 9; x++) {
       const sq = createDiv(rowDiv, { className: SQ_CLASS, text: SHOW_COORDS ? `${x}, ${y}` : "" })
       sq.addEventListener("mouseenter", () => { hoverSquare = { x, y } })
       sq.addEventListener("mouseleave", () => { hoverSquare = { x: -1, y: -1 } })
       row.push(sq)
-      rowState.push(0)
+      rowGrid.push(0)
+      rowUser.push(0)
       if (x === 2 || x === 5) {
         createDiv(rowDiv, { className: "separator-row" })
       }
     }
     grid.push(row)
-    gridState.push(rowState)
+    gridState.push(rowGrid)
+    userState.push(rowUser)
     if (y === 2 || y === 5) {
       createDiv(gridDiv, { className: "separator-col" })
     }
@@ -80,9 +94,9 @@ const attachKeyListeners = () => {
     const { x, y } = hoverSquare
     if (x > -1 && y > -1) {
       if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].indexOf(e.key) > -1) {
-        setInGrid(x, y, parseInt(e.key))
+        setInGridUser(x, y, parseInt(e.key))
       } else {
-        setInGrid(x, y, 0)
+        setInGridUser(x, y, 0)
       }
     }
   })
@@ -98,10 +112,28 @@ const setInGrid = (x, y, val, color = "") => {
   }
 }
 
+const setInGridUser = (x, y, val) => {
+  setInGrid(x, y, val)
+  userState[y][x] = val
+  localStorage.setItem("current", JSON.stringify(userState))
+}
+
 const clearGrid = () => {
   for (let y = 0; y < 9; y++) {
     for (let x = 0; x < 9; x++) {
       setInGrid(x, y, 0)
+      userState[y][x] = 0
+    }
+  }
+  localStorage.setItem("current", "")
+}
+
+const clearSolution = () => {
+  for (let y = 0; y < 9; y++) {
+    for (let x = 0; x < 9; x++) {
+      if (!userState[y][x]) {
+        setInGrid(x, y, 0)
+      } 
     }
   }
 }
@@ -195,6 +227,7 @@ const getPossibleNumbers = (x, y) => {
 }
 
 const eliminateBasics = () => {
+  // Naked Singles
   const possibleCells = []
   for (let y = 0; y < 9; y++) {
     for (let x = 0; x < 9; x++) {
@@ -219,21 +252,13 @@ const eliminateBasics = () => {
 }
 
 const eliminateUniquesFromQuad = () => {
+  // Hidden Singles
   let somethingEliminated = false
-  for (let key in quadrants) {
-    const quad = quadrants[key]
-    const numbers = {
-      "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [],
-    }
-    for (let i = 0; i < quad.length; i++) {
-      const { x, y } = quad[i]
-      if (getVal(x, y) === 0) {
-        const possibleNumbers = getPossibleNumbers(x, y)
-        possibleNumbers.forEach((n) => {
-          numbers[n].push({ x, y })
-        })
-      }
-    }
+  let numbers = {
+    "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [],
+  }
+
+  const eliminate = () => {
     for (let num in numbers) {
       const numPositions = numbers[num]
       if (numPositions.length === 1) {
@@ -245,6 +270,57 @@ const eliminateUniquesFromQuad = () => {
       }
     }
   }
+
+  // Row
+  for (let y = 0; y < 9; y++) {
+    numbers = {
+      "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [],
+    }
+    for (let x = 0; x < 9; x++) {
+      if (getVal(x, y) === 0) {
+        const possibleNumbers = getPossibleNumbers(x, y)
+        possibleNumbers.forEach((n) => {
+          numbers[n].push({ x, y })
+        })
+      }
+    }
+    eliminate()
+  }
+
+  // Col
+  for (let x = 0; x < 9; x++) {
+    numbers = {
+      "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [],
+    }
+    for (let y = 0; y < 9; y++) {
+      if (getVal(x, y) === 0) {
+        const possibleNumbers = getPossibleNumbers(x, y)
+        possibleNumbers.forEach((n) => {
+          numbers[n].push({ x, y })
+        })
+      }
+    }
+    eliminate()
+  }
+
+  // Quad
+  for (let key in quadrants) {
+    const quad = quadrants[key]
+    numbers = {
+      "1": [], "2": [], "3": [], "4": [], "5": [], "6": [], "7": [], "8": [], "9": [],
+    }
+    for (let i = 0; i < quad.length; i++) {
+      const { x, y } = quad[i]
+      if (getVal(x, y) === 0) {
+        const possibleNumbers = getPossibleNumbers(x, y)
+        possibleNumbers.forEach((n) => {
+          numbers[n].push({ x, y })
+        })
+      }
+    }
+    eliminate()
+  }
+
   return somethingEliminated
 }
 
