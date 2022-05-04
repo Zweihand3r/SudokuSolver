@@ -1,13 +1,24 @@
-import { constructData, easy, medium, custom } from "/data.js"
-
-const PUZZLE = medium
+import { constructData, easy, medium, hard, custom } from "/data.js"
 
 const SHOW_COORDS = false
 const SQ_CLASS = `sq ${SHOW_COORDS && "sq-debug"}`
+const SOLVE_INTERVAL = 120
+const SOLVE_SHOW_POSSIBLES = true
+const ONE_BY_ONE = true
+
+const PUZZLES = {
+  easy, medium, hard
+}
+
+const PUZZLE = PUZZLES.easy
 
 const COLORS = {
   green: "green",
-  blue: "blue"
+  blue: "blue",
+  red: "red",
+  yellow: "yellow",
+  purple: "purple",
+  gray: "gray"
 }
 
 const gridDiv = document.querySelector("#grid")
@@ -16,13 +27,16 @@ const solveBtn = document.querySelector("#solve")
 const possiblesBtn = document.querySelector("#possibles")
 const clearBtn = document.querySelector("#clear")
 const clearSolBtn = document.querySelector("#clearSol")
+const diffSelect = document.querySelector("#diffSelect")
 const grid = []
 const gridState = []
 const quadrants = {
   q1: [], q2: [], q3: [], q4: [], q5: [], q6: [], q7: [], q8: [], q9: []
 }
 let hoverSquare = { x: -1, y: -1 }
+let clickSquare = { x: -1, y: -1 }
 let userState = [] // For storing user input
+let isTrial = false, trialHistory = []
 
 const init = () => {
   contBtn.addEventListener("click", solve1Cycle)
@@ -30,6 +44,15 @@ const init = () => {
   possiblesBtn.addEventListener("click", showPossibleNumbers)
   clearBtn.addEventListener("click", clearGrid)
   clearSolBtn.addEventListener("click", clearSolution)
+  diffSelect.addEventListener("change", e => {
+    const puzzle = PUZZLES[e.target.value]
+    if (puzzle) {
+      clearGrid()
+      puzzle.forEach(({ x, y, val }) => {
+        setInGridUser(x, y, val)
+      });
+    }
+  })
 
   createGrid()
   attachKeyListeners()
@@ -73,6 +96,7 @@ const createGrid = () => {
       const sq = createDiv(rowDiv, { className: SQ_CLASS, text: SHOW_COORDS ? `${x}, ${y}` : "" })
       sq.addEventListener("mouseenter", () => { hoverSquare = { x, y } })
       sq.addEventListener("mouseleave", () => { hoverSquare = { x: -1, y: -1 } })
+      sq.addEventListener("click", () => { clickSquare = { x, y } })
       row.push(sq)
       rowGrid.push(0)
       rowUser.push(0)
@@ -92,11 +116,20 @@ const createGrid = () => {
 const attachKeyListeners = () => {
   document.addEventListener("keypress", (e) => {
     const { x, y } = hoverSquare
+    const isClick = x === clickSquare.x && y === clickSquare.y
     if (x > -1 && y > -1) {
       if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].indexOf(e.key) > -1) {
-        setInGridUser(x, y, parseInt(e.key))
+        if (isClick) {
+          setInGrid(x, y, parseInt(e.key), COLORS.gray)
+        } else {
+          setInGridUser(x, y, parseInt(e.key))
+        }
       } else {
-        setInGridUser(x, y, 0)
+        if (isClick) {
+          setInGrid(x, y, parseInt(e.key), COLORS.gray)
+        } else {
+          setInGridUser(x, y, 0)
+        }
       }
     }
   })
@@ -142,7 +175,7 @@ const getVal = (x, y) => {
   return gridState[y][x]
 }
 
-const generateQuadrants = (x, y) => {
+const generateQuadrants = () => {
   for (let y = 0; y < 9; y++) {
     for (let x = 0; x < 9; x++) {
       if (y < 3) {
@@ -244,6 +277,9 @@ const eliminateBasics = () => {
     for (let i in possibleCells) {
       const { x, y, val } = possibleCells[i]
       setInGrid(x, y, val, COLORS.green)
+      if (ONE_BY_ONE) {
+        return true
+      }
     }
     return true
   } else {
@@ -271,6 +307,18 @@ const eliminateUniquesFromQuad = () => {
     }
   }
 
+  const eliminateOnyByOne = () => {
+    for (let num in numbers) {
+      const numPositions = numbers[num]
+      if (numPositions.length === 1) {
+        const { x, y } = numPositions[0]
+        setInGrid(x, y, parseInt(num), COLORS.blue)
+        return true
+      }
+    }
+    return false
+  }
+
   // Row
   for (let y = 0; y < 9; y++) {
     numbers = {
@@ -284,7 +332,13 @@ const eliminateUniquesFromQuad = () => {
         })
       }
     }
-    eliminate()
+    if (ONE_BY_ONE) {
+      if (eliminateOnyByOne()) {
+        return true
+      }
+    } else {
+      eliminate()
+    }
   }
 
   // Col
@@ -300,7 +354,13 @@ const eliminateUniquesFromQuad = () => {
         })
       }
     }
-    eliminate()
+    if (ONE_BY_ONE) {
+      if (eliminateOnyByOne()) {
+        return true
+      }
+    } else {
+      eliminate()
+    }
   }
 
   // Quad
@@ -318,25 +378,47 @@ const eliminateUniquesFromQuad = () => {
         })
       }
     }
-    eliminate()
+    if (ONE_BY_ONE) {
+      if (eliminateOnyByOne()) {
+        return true
+      }
+    } else {
+      eliminate()
+    }
   }
 
-  return somethingEliminated
+  if (ONE_BY_ONE) {
+    return false
+  } else {
+    return somethingEliminated
+  }
 }
 
 const solve1Cycle = () => {
   if (eliminateBasics()) {
     return true
   } else {
-    return eliminateUniquesFromQuad()
+    if (eliminateUniquesFromQuad()) {
+      return true
+    } else {
+      return false
+    }
   }
 }
 
 const solve = () => {
   let status = true
-  while (status) {
-    status = solve1Cycle()
-  }
+  const interval = setInterval(() => {
+    if (status) {
+      status = solve1Cycle()
+    } else {
+      console.log("Can't go on!")
+      clearInterval(interval)
+    }
+    if (SOLVE_SHOW_POSSIBLES) {
+      showPossibleNumbers()
+    }
+  }, SOLVE_INTERVAL)
 }
 
 const showPossibleNumbers = () => {

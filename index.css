@@ -67,10 +67,30 @@ body {
   color: rgb(55, 165, 255);
 }
 
+.red {
+  color: #d94242;
+}
+
+.yellow {
+  color: #f2cc4e;
+}
+
+.purple {
+  color: #c74fdf;
+}
+
+.gray {
+  color: #888;
+}
+
 .controls {
   margin: auto;
   margin-top: 20px;
   width: fit-content;
+}
+
+.controls select {
+  height: 44px;
 }
 
 .controls button {
