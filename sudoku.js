@@ -1,4 +1,4 @@
-import { constructData, easy, medium, hard, custom } from "/data.js"
+import { constructData, easy, medium, hard, custom } from "/puzzles.js"
 
 const SHOW_COORDS = false
 const SQ_CLASS = `sq ${SHOW_COORDS && "sq-debug"}`
