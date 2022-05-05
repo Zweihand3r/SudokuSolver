@@ -3,6 +3,11 @@ body {
   font-family: "Gill Sans", sans-serif;
 }
 
+button, select {
+  font-family: inherit;
+  font-size: 1em;
+}
+
 .root {
   padding-top: 4px;
   display: flex;
@@ -12,7 +17,9 @@ body {
 #info {
   margin: auto;
   color: #cdcdcd;
-  padding-bottom: 44px;
+  padding-bottom: 24px;
+  text-align: center;
+  line-height: 20px;
 }
 
 #grid {
@@ -35,6 +42,7 @@ body {
   padding-top: 6px;
   box-sizing: border-box;
   font-size: 42px;
+  font-weight: 150;
   color: #cdcdcd;
 }
 
@@ -48,10 +56,11 @@ body {
 }
 
 .sq-posbl {
-  padding: 4px;
+  padding: 5px 4px;
   font-size: 17px;
   line-height: 17px;
   color: #888;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .separator-row {
@@ -99,9 +108,11 @@ body {
 }
 
 .controls select {
-  height: 44px;
+  height: 46px;
+  margin: 0 2px;
 }
 
 .controls button {
   padding: 12px;
+  margin: 0 4px;
 }

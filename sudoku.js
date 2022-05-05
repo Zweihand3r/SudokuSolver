@@ -99,7 +99,7 @@ const createGrid = () => {
     const rowDiv = createDiv(gridDiv, { className: "row" })
     for (let x = 0; x < 9; x++) {
       const sq = createDiv(rowDiv, { className: SQ_CLASS, text: SHOW_COORDS ? `${x}, ${y}` : "" })
-      sq.addEventListener("mouseenter", () => { hoverSquare = { x, y } })
+      sq.addEventListener("mouseenter", () => { hoverSquare = { x, y }, clickSquare = { x: -1, y: -1 } })
       sq.addEventListener("mouseleave", () => { hoverSquare = { x: -1, y: -1 } })
       sq.addEventListener("click", () => { clickSquare = { x, y } })
       row.push(sq)
@@ -165,6 +165,7 @@ const clearGrid = () => {
       userState[y][x] = 0
     }
   }
+  isTrial = false
   localStorage.setItem("current", "")
 }
 
@@ -176,6 +177,7 @@ const clearSolution = () => {
       } 
     }
   }
+  isTrial = false
 }
 
 const getVal = (x, y) => {
@@ -429,32 +431,30 @@ const checkDeadEnd = () => {
    * 1: Dead end
    * 2: No dead end
    */
-  if (isTrial) {
-    if (trialHistory.length > 0) {
-      for (let y = 0; y < 9; y++) {
-        for (let x = 0; x < 9; x++) {
-          if (getVal(x, y) === 0) {
-            const possibleNumbers = getPossibleNumbers(x, y)
-            if (possibleNumbers.length === 0) {
-              console.log("Reached dead end!")
-              const { snapshot, x, y, nextPossible } = trialHistory[trialHistory.length - 1]
-              trialHistory.pop()
-              for (let _y = 0; _y < 9; _y++) {
-                for (let _x = 0; _x < 9; _x++) {
-                  if (snapshot[_y][_x] === 0) {
-                    setInGrid(_x, _y, 0)
-                  }
+  for (let y = 0; y < 9; y++) {
+    for (let x = 0; x < 9; x++) {
+      if (getVal(x, y) === 0) {
+        const possibleNumbers = getPossibleNumbers(x, y)
+        if (possibleNumbers.length === 0) {
+          console.log("Reached dead end!")
+          if (trialHistory.length > 0) {
+            const { snapshot, x, y, nextPossible } = trialHistory[trialHistory.length - 1]
+            trialHistory.pop()
+            for (let _y = 0; _y < 9; _y++) {
+              for (let _x = 0; _x < 9; _x++) {
+                if (snapshot[_y][_x] === 0) {
+                  setInGrid(_x, _y, 0)
                 }
               }
-              setInGrid(x, y, nextPossible, COLORS.red)
-              return 1
             }
+            setInGrid(x, y, nextPossible, COLORS.red)
+            return 1
+          } else {
+            alert("Cannot find solution :(")
+            return 0
           }
         }
       }
-    } else {
-      alert("Cannot find solution :(")
-      return 0
     }
   }
 
@@ -486,6 +486,8 @@ const solve1Cycle = () => {
         }
       }
     }
+  } else {
+    rv = false
   }
 
   if (SOLVE_SHOW_POSSIBLES) {
@@ -503,6 +505,7 @@ const solve = () => {
       console.log("Can't go on!")
       clearInterval(solveIntervalId)
       isSolving = false
+      isTrial = false
       togglePanel()
     }
   }, SOLVE_INTERVAL)
@@ -531,12 +534,22 @@ const togglePanel = () => {
   stopBtn.style.display =  isSolving ? "block" : "none"
 }
 
+const formatPossibles = (possibles) => {
+  const chars = []
+  for (let n = 1; n <= 9; n++) {
+    chars.push(
+      possibles.indexOf(n) > -1 ? `${n}` : '&nbsp'
+    )
+  }
+  return `${chars[0]} ${chars[1]} ${chars[2]} ${chars[3]} ${chars[4]} ${chars[5]} ${chars[6]} ${chars[7]} ${chars[8]}`
+}
+
 const showPossibleNumbers = () => {
   for (let y = 0; y < 9; y++) {
     for (let x = 0; x < 9; x++) {
       if (getVal(x, y) === 0) {
-        const possibleNumbers = getPossibleNumbers(x, y).join(" ")
-        grid[y][x].innerHTML = possibleNumbers
+        const possibleNumbers = getPossibleNumbers(x, y)
+        grid[y][x].innerHTML = formatPossibles(possibleNumbers)
         grid[y][x].className = "sq sq-posbl"
       }
     }
