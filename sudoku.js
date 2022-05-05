@@ -28,11 +28,13 @@ const possiblesBtn = document.querySelector("#possibles")
 const clearBtn = document.querySelector("#clear")
 const clearSolBtn = document.querySelector("#clearSol")
 const diffSelect = document.querySelector("#diffSelect")
+const stopBtn = document.querySelector("#stopBtn")
 const grid = []
 const gridState = []
 const quadrants = {
   q1: [], q2: [], q3: [], q4: [], q5: [], q6: [], q7: [], q8: [], q9: []
 }
+let isSolving = false, solveIntervalId = 0
 let hoverSquare = { x: -1, y: -1 }
 let clickSquare = { x: -1, y: -1 }
 let userState = [] // For storing user input
@@ -40,11 +42,11 @@ let isTrial = false, trialHistory = []
 
 const init = () => {
   contBtn.addEventListener("click", solve1Cycle)
-  solveBtn.addEventListener("click", solve)
+  solveBtn.addEventListener("click", toggleSolve)
   possiblesBtn.addEventListener("click", showPossibleNumbers)
   clearBtn.addEventListener("click", clearGrid)
   clearSolBtn.addEventListener("click", clearSolution)
-  diffSelect.addEventListener("change", e => {
+  diffSelect.addEventListener("input", e => {
     const puzzle = PUZZLES[e.target.value]
     if (puzzle) {
       clearGrid()
@@ -53,6 +55,7 @@ const init = () => {
       });
     }
   })
+  stopBtn.addEventListener("click", toggleSolve)
 
   createGrid()
   attachKeyListeners()
@@ -63,6 +66,7 @@ const init = () => {
     puzzleData.forEach(({ x, y, val }) => {
       setInGridUser(x, y, val)
     });
+    diffSelect.value = "custom"
   } else {
     PUZZLE.forEach(({ x, y, val }) => {
       setInGridUser(x, y, val)
@@ -70,6 +74,7 @@ const init = () => {
   }
 
   generateQuadrants()
+  togglePanel()
 }
 
 const createDiv = (parent, { id, className, classList, text }) => {
@@ -123,12 +128,14 @@ const attachKeyListeners = () => {
           setInGrid(x, y, parseInt(e.key), COLORS.gray)
         } else {
           setInGridUser(x, y, parseInt(e.key))
+          diffSelect.value = "custom"
         }
       } else {
         if (isClick) {
           setInGrid(x, y, parseInt(e.key), COLORS.gray)
         } else {
           setInGridUser(x, y, 0)
+          diffSelect.value = "custom"
         }
       }
     }
@@ -210,6 +217,17 @@ const getQuadrant = (_x, _y) => {
   }
 }
 
+const checkIfFinished = () => {
+  for (let y = 0; y < 9; y++) {
+    for (let x = 0; x < 9; x++) {
+      if (getVal(x, y) === 0) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
 const getPossibleNumbers = (x, y) => {
   /* Gets all the possible numbers that can be set in a square */
 
@@ -276,7 +294,7 @@ const eliminateBasics = () => {
   if (possibleCells.length > 0) {
     for (let i in possibleCells) {
       const { x, y, val } = possibleCells[i]
-      setInGrid(x, y, val, COLORS.green)
+      setInGrid(x, y, val, isTrial ? COLORS.yellow : COLORS.green)
       if (ONE_BY_ONE) {
         return true
       }
@@ -300,23 +318,14 @@ const eliminateUniquesFromQuad = () => {
       if (numPositions.length === 1) {
         const { x, y } = numPositions[0]
         setInGrid(x, y, parseInt(num), COLORS.blue)
-        if (!somethingEliminated) {
+        if (ONE_BY_ONE) {
+          return true
+        } else if (!somethingEliminated) {
           somethingEliminated = true
         }
       }
     }
-  }
-
-  const eliminateOnyByOne = () => {
-    for (let num in numbers) {
-      const numPositions = numbers[num]
-      if (numPositions.length === 1) {
-        const { x, y } = numPositions[0]
-        setInGrid(x, y, parseInt(num), COLORS.blue)
-        return true
-      }
-    }
-    return false
+    if (ONE_BY_ONE) return false
   }
 
   // Row
@@ -333,7 +342,7 @@ const eliminateUniquesFromQuad = () => {
       }
     }
     if (ONE_BY_ONE) {
-      if (eliminateOnyByOne()) {
+      if (eliminate()) {
         return true
       }
     } else {
@@ -355,7 +364,7 @@ const eliminateUniquesFromQuad = () => {
       }
     }
     if (ONE_BY_ONE) {
-      if (eliminateOnyByOne()) {
+      if (eliminate()) {
         return true
       }
     } else {
@@ -379,7 +388,7 @@ const eliminateUniquesFromQuad = () => {
       }
     }
     if (ONE_BY_ONE) {
-      if (eliminateOnyByOne()) {
+      if (eliminate()) {
         return true
       }
     } else {
@@ -394,31 +403,132 @@ const eliminateUniquesFromQuad = () => {
   }
 }
 
-const solve1Cycle = () => {
-  if (eliminateBasics()) {
-    return true
-  } else {
-    if (eliminateUniquesFromQuad()) {
-      return true
-    } else {
-      return false
+const tryPossible = () => {
+  for (let y = 0; y < 9; y++) {
+    for (let x = 0; x < 9; x++) {
+      if (getVal(x, y) === 0) {
+        const possibleNumbers = getPossibleNumbers(x, y)
+        if (possibleNumbers.length === 2) {
+          console.log("Here!")
+          trialHistory.push({
+            snapshot: JSON.parse(JSON.stringify(gridState)),
+            x, y, nextPossible: possibleNumbers[1]
+          })
+          setInGrid(x, y, possibleNumbers[0], COLORS.red)
+          return
+        }
+      }
     }
   }
 }
 
+const checkDeadEnd = () => {
+  /**
+   * Returns
+   * 0: No solution
+   * 1: Dead end
+   * 2: No dead end
+   */
+  if (isTrial) {
+    if (trialHistory.length > 0) {
+      for (let y = 0; y < 9; y++) {
+        for (let x = 0; x < 9; x++) {
+          if (getVal(x, y) === 0) {
+            const possibleNumbers = getPossibleNumbers(x, y)
+            if (possibleNumbers.length === 0) {
+              console.log("Reached dead end!")
+              const { snapshot, x, y, nextPossible } = trialHistory[trialHistory.length - 1]
+              trialHistory.pop()
+              for (let _y = 0; _y < 9; _y++) {
+                for (let _x = 0; _x < 9; _x++) {
+                  if (snapshot[_y][_x] === 0) {
+                    setInGrid(_x, _y, 0)
+                  }
+                }
+              }
+              setInGrid(x, y, nextPossible, COLORS.red)
+              return 1
+            }
+          }
+        }
+      }
+    } else {
+      alert("Cannot find solution :(")
+      return 0
+    }
+  }
+
+  return 2
+}
+
+const trialAndForce = () => {
+  if (checkIfFinished()) {
+    return false
+  } 
+
+  if (!isTrial) {
+    isTrial = true
+  }
+
+  tryPossible()
+
+  return true
+}
+
+const solve1Cycle = () => {
+  let rv = true
+
+  if (checkDeadEnd()) {
+    if (!eliminateBasics()) {
+      if (!eliminateUniquesFromQuad()) {
+        if (!trialAndForce()) {
+          rv = false
+        }
+      }
+    }
+  }
+
+  if (SOLVE_SHOW_POSSIBLES) {
+    showPossibleNumbers()
+  }
+  return rv
+}
+
 const solve = () => {
   let status = true
-  const interval = setInterval(() => {
+  solveIntervalId = setInterval(() => {
     if (status) {
       status = solve1Cycle()
     } else {
       console.log("Can't go on!")
-      clearInterval(interval)
-    }
-    if (SOLVE_SHOW_POSSIBLES) {
-      showPossibleNumbers()
+      clearInterval(solveIntervalId)
+      isSolving = false
+      togglePanel()
     }
   }, SOLVE_INTERVAL)
+}
+
+const toggleSolve = () => {
+  if (!isSolving) {
+    solve()
+    isSolving = true
+  } else {
+    clearInterval(solveIntervalId)
+    isSolving = false
+  }
+  togglePanel()
+}
+
+const togglePanel = () => {
+  contBtn.style.display = isSolving ? "none" : "block"
+  solveBtn.style.display = isSolving ? "none" : "block"
+  possiblesBtn.style.display = isSolving ? "none" : "block"
+  clearBtn.style.display = isSolving ? "none" : "block"
+  clearSolBtn.style.display = isSolving ? "none" : "block"
+  diffSelect.style.display = isSolving ? "none" : "block"
+  solveBtn.style.display = isSolving ? "none" : "block"
+
+  stopBtn.style.display =  isSolving ? "block" : "none"
 }
 
 const showPossibleNumbers = () => {

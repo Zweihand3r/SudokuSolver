@@ -1,11 +1,18 @@
 body {
   background-color: #323232;
+  font-family: "Gill Sans", sans-serif;
 }
 
 .root {
-  padding-top: 64px;
+  padding-top: 4px;
   display: flex;
   flex-direction: column;
+}
+
+#info {
+  margin: auto;
+  color: #cdcdcd;
+  padding-bottom: 44px;
 }
 
 #grid {
@@ -87,6 +94,8 @@ body {
   margin: auto;
   margin-top: 20px;
   width: fit-content;
+  display: flex;
+  flex-direction: row;
 }
 
 .controls select {
