@@ -12,8 +12,10 @@
 <body>
   <div class="root">
     <div id="info">
-      To add a new puzzle click "Clear Grid" button, hover over a square and type 1-9 to add a number or any other key to clear the square
-      <br/>
+      <span id="desktop-info">
+        To add a new puzzle click "Clear Grid" button, hover over a square and type 1-9 to add a number or any other key to clear the square
+        <br/>
+      </span>
       Square solved by -
       <span class="green">Naked Singles</span> -
       <span class="blue">Hidden Singles</span> -
@@ -22,6 +24,22 @@
       <span class="purple">Hidden Singles after Guess</span>
     </div>
     <div id="grid"></div>
+    <div id="keypad" class="controls">
+      <div>
+        <button id="keypad1">1</button>
+        <button id="keypad2">2</button>
+        <button id="keypad3">3</button>
+        <button id="keypad4">4</button>
+        <button id="keypad5">5</button>
+      </div>
+      <div>
+        <button id="keypad6">6</button>
+        <button id="keypad7">7</button>
+        <button id="keypad8">8</button>
+        <button id="keypad9">9</button>
+        <button id="keypadC">C</button>
+      </div>
+    </div>
     <div class="controls">
       <button id="clear">Clear Grid</button>
       <button id="clearSol">Clear Solution</button>

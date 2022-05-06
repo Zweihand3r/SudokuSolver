@@ -6,6 +6,13 @@ const SOLVE_INTERVAL = 120
 const SOLVE_SHOW_POSSIBLES = true
 const ONE_BY_ONE = true
 const ENABLE_DIFFICULTY_SELECTION = false
+const IS_MOBILE = document.body.clientWidth <= 1024
+const SQ_SIZE = Math.min(document.body.clientWidth / 9 - 2, 64)
+const FONT_SIZE_MAIN = 42 / 64 * SQ_SIZE
+const FONT_SIZE_CANDIDATES = 17 / 64 * SQ_SIZE
+const PADDING_TOP_MAIN = 10 / 64 * SQ_SIZE
+const PADDING_VERT_CANDIDATES = 5 / 64 * SQ_SIZE
+const PADDING_HORZ_CANDIDATES = 4 / 64 * SQ_SIZE
 
 const PUZZLES = {
   easy, medium, hard
@@ -28,6 +35,7 @@ const clearBtn = document.querySelector("#clear")
 const clearSolBtn = document.querySelector("#clearSol")
 const diffSelect = document.querySelector("#diffSelect")
 const stopBtn = document.querySelector("#stopBtn")
+const desktopInfoSpan = document.querySelector("#desktop-info")
 const grid = []
 const gridState = []
 const quadrants = {
@@ -38,6 +46,7 @@ let hoverSquare = { x: -1, y: -1 }
 let clickSquare = { x: -1, y: -1 }
 let userState = [] // For storing user input
 let isTrial = false, trialHistory = []
+let activeKeypadNumber = -1
 
 const init = () => {
   contBtn.addEventListener("click", solve1Cycle)
@@ -60,8 +69,15 @@ const init = () => {
     diffSelect.style.display = 'none'
   }
 
+  document.addEventListener('contextmenu', e => e.preventDefault())
+
+  if (IS_MOBILE) {
+    desktopInfoSpan.innerHTML = 'Tap on a number at the bottom to select it and tap on any square on the grid to apply that number<br/><hr>'
+  }
+
   createGrid()
   attachKeyListeners()
+  attachKeypadListeners()
 
   if (localStorage.getItem("current")) {
     userState = JSON.parse(localStorage.getItem("current"))
@@ -105,7 +121,18 @@ const createGrid = () => {
       const sq = createDiv(rowDiv, { className: SQ_CLASS, text: SHOW_COORDS ? `${x}, ${y}` : "" })
       sq.addEventListener("mouseenter", () => { hoverSquare = { x, y }, clickSquare = { x: -1, y: -1 } })
       sq.addEventListener("mouseleave", () => { hoverSquare = { x: -1, y: -1 } })
-      sq.addEventListener("click", () => { clickSquare = { x, y } })
+      sq.addEventListener("click", () => {
+        clickSquare = { x, y }
+        if (IS_MOBILE && activeKeypadNumber > -1) {
+          setInGridUser(x, y, activeKeypadNumber)
+        }
+      })
+      if (IS_MOBILE) {
+        sq.style.width = `${SQ_SIZE}px`
+        sq.style.height = `${SQ_SIZE}px`
+        sq.style.fontSize = `${42 / 64 * SQ_SIZE}px`
+        sq.style.padding = `${PADDING_TOP_MAIN}px 0 0 0`
+      }
       row.push(sq)
       rowGrid.push(0)
       rowUser.push(0)
@@ -146,11 +173,37 @@ const attachKeyListeners = () => {
   })
 }
 
+const attachKeypadListeners = () => {
+  const keypadBtns = []
+  const handleClick = i => {
+    activeKeypadNumber = i < 9 ? i + 1 : 0
+    keypadBtns.forEach((btn, _i) => {
+      btn.className = i === _i ? 'keypadBtnActive' : ''
+    })
+  }
+
+  for (let i = 0; i < 9; i++) {
+    const btn = document.querySelector(`#keypad${i + 1}`)
+    keypadBtns.push(btn)
+    btn.addEventListener("click", () => handleClick(i))
+  }
+
+  const btnC = document.querySelector('#keypadC')
+  keypadBtns.push(btnC)
+  btnC.addEventListener(
+    'click', () => handleClick(9)
+  )
+}
+
 const setInGrid = (x, y, val, color = "") => {
   if (typeof val === "number") {
     gridState[y][x] = val
     grid[y][x].innerHTML = `${SHOW_COORDS ? `${x}, ${y}<br/>` : ""}${val ? val : ""}`
     grid[y][x].className = `${SQ_CLASS} ${color}`
+    if (IS_MOBILE) {
+      grid[y][x].style.fontSize = `${FONT_SIZE_MAIN}px`
+      grid[y][x].style.padding = `${PADDING_TOP_MAIN}px 0 0 0`
+    }
   } else {
     throw("setInGrid val expects integer")
   }
@@ -562,6 +615,10 @@ const showPossibleNumbers = () => {
         const possibleNumbers = getPossibleNumbers(x, y)
         grid[y][x].innerHTML = formatPossibles(possibleNumbers)
         grid[y][x].className = "sq sq-posbl"
+        if (IS_MOBILE) {
+          grid[y][x].style.fontSize = `${FONT_SIZE_CANDIDATES}px`
+          grid[y][x].style.padding = `${PADDING_VERT_CANDIDATES}px ${PADDING_HORZ_CANDIDATES}px`
+        }
       }
     }
   }
