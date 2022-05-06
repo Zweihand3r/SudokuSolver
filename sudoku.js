@@ -5,12 +5,11 @@ const SQ_CLASS = `sq ${SHOW_COORDS && "sq-debug"}`
 const SOLVE_INTERVAL = 120
 const SOLVE_SHOW_POSSIBLES = true
 const ONE_BY_ONE = true
+const ENABLE_DIFFICULTY_SELECTION = false
 
 const PUZZLES = {
   easy, medium, hard
 }
-
-const PUZZLE = PUZZLES.easy
 
 const COLORS = {
   green: "green",
@@ -46,16 +45,20 @@ const init = () => {
   possiblesBtn.addEventListener("click", showPossibleNumbers)
   clearBtn.addEventListener("click", clearGrid)
   clearSolBtn.addEventListener("click", clearSolution)
-  diffSelect.addEventListener("input", e => {
-    const puzzle = PUZZLES[e.target.value]
-    if (puzzle) {
-      clearGrid()
-      puzzle.forEach(({ x, y, val }) => {
-        setInGridUser(x, y, val)
-      });
-    }
-  })
   stopBtn.addEventListener("click", toggleSolve)
+  if (ENABLE_DIFFICULTY_SELECTION) {
+    diffSelect.addEventListener("input", e => {
+      const puzzle = PUZZLES[e.target.value]
+      if (puzzle) {
+        clearGrid()
+        puzzle.forEach(({ x, y, val }) => {
+          setInGridUser(x, y, val)
+        });
+      }
+    })
+  } else {
+    diffSelect.style.display = 'none'
+  }
 
   createGrid()
   attachKeyListeners()
@@ -68,7 +71,8 @@ const init = () => {
     });
     diffSelect.value = "custom"
   } else {
-    PUZZLE.forEach(({ x, y, val }) => {
+    const puzzle = PUZZLES[["easy", "medium", "hard"][Math.floor(Math.random() * 3)]]
+    puzzle.forEach(({ x, y, val }) => {
       setInGridUser(x, y, val)
     });
   }
@@ -202,9 +206,6 @@ const generateQuadrants = () => {
       }
     }
   }
-
-  console.log("Quadrants generated:")
-  console.log(quadrants)
 }
 
 const getQuadrant = (_x, _y) => {
@@ -319,7 +320,7 @@ const eliminateUniquesFromQuad = () => {
       const numPositions = numbers[num]
       if (numPositions.length === 1) {
         const { x, y } = numPositions[0]
-        setInGrid(x, y, parseInt(num), COLORS.blue)
+        setInGrid(x, y, parseInt(num), isTrial ? COLORS.purple : COLORS.blue)
         if (ONE_BY_ONE) {
           return true
         } else if (!somethingEliminated) {
@@ -406,22 +407,25 @@ const eliminateUniquesFromQuad = () => {
 }
 
 const tryPossible = () => {
+  let leastPossibles = { len: 9, possibles: [1, 2, 3, 4, 5, 6, 7, 8, 9], x: 0, y: 0 }
   for (let y = 0; y < 9; y++) {
     for (let x = 0; x < 9; x++) {
       if (getVal(x, y) === 0) {
-        const possibleNumbers = getPossibleNumbers(x, y)
-        if (possibleNumbers.length === 2) {
-          console.log("Here!")
-          trialHistory.push({
-            snapshot: JSON.parse(JSON.stringify(gridState)),
-            x, y, nextPossible: possibleNumbers[1]
-          })
-          setInGrid(x, y, possibleNumbers[0], COLORS.red)
-          return
+        const possibles = getPossibleNumbers(x, y)
+        const len = possibles.length
+        if (len < leastPossibles.len) {
+          leastPossibles = { len, possibles, x, y }
         }
       }
     }
   }
+  const { possibles, x, y } = leastPossibles
+  const index = 0
+  trialHistory.push({
+    x, y, index, possibles,
+    snapshot: JSON.parse(JSON.stringify(gridState))
+  })
+  setInGrid(x, y, possibles[index], COLORS.red)
 }
 
 const checkDeadEnd = () => {
@@ -438,8 +442,13 @@ const checkDeadEnd = () => {
         if (possibleNumbers.length === 0) {
           console.log("Reached dead end!")
           if (trialHistory.length > 0) {
-            const { snapshot, x, y, nextPossible } = trialHistory[trialHistory.length - 1]
-            trialHistory.pop()
+            const { x, y, index, possibles, snapshot } = trialHistory[trialHistory.length - 1]
+            const nextPossible = possibles[index + 1]
+            if (index + 1 === possibles.length - 1) {
+              trialHistory.pop()
+            } else {
+              trialHistory[trialHistory.length - 1].index += 1
+            }
             for (let _y = 0; _y < 9; _y++) {
               for (let _x = 0; _x < 9; _x++) {
                 if (snapshot[_y][_x] === 0) {
@@ -448,6 +457,7 @@ const checkDeadEnd = () => {
               }
             }
             setInGrid(x, y, nextPossible, COLORS.red)
+
             return 1
           } else {
             alert("Cannot find solution :(")
@@ -468,6 +478,7 @@ const trialAndForce = () => {
 
   if (!isTrial) {
     isTrial = true
+    trialHistory = []
   }
 
   tryPossible()
@@ -528,7 +539,7 @@ const togglePanel = () => {
   possiblesBtn.style.display = isSolving ? "none" : "block"
   clearBtn.style.display = isSolving ? "none" : "block"
   clearSolBtn.style.display = isSolving ? "none" : "block"
-  diffSelect.style.display = isSolving ? "none" : "block"
+  diffSelect.style.display = isSolving || !ENABLE_DIFFICULTY_SELECTION ? "none" : "block"
   solveBtn.style.display = isSolving ? "none" : "block"
 
   stopBtn.style.display =  isSolving ? "block" : "none"
